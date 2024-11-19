@@ -245,8 +245,9 @@ def handle_message_reaction(sock, data, message):
         #print(f"Unknown message Type received: {message_type}: {message_content} ", )
 ########################################################################################################################################
 # Data specific messaging code
+import random
 
-def broadcast_write(key, value):
+def broadcast_write(key, value, randDelay = False):
     print(f"Start Write: {key}, {value}")
     global name
     global vectorClock
@@ -264,6 +265,8 @@ def broadcast_write(key, value):
     #handle update message to a single center
     def send_update_to_center(data_center):
         try:
+            if randDelay:
+                time.sleep(random.uniform(0,1))
             time.sleep(data_center["delay"])  # Simulate network latency
             sock = open_server_connection(
                 server_name=data_center["name"],
@@ -301,7 +304,7 @@ def accept_incoming_connection(sock):
     connections += 1
     
     newCid = 'conn' + str(connections)
-    print(f"Accepted connection from {addr}, gave cid: {newCid}")
+    #print(f"Accepted connection from {addr}, gave cid: {newCid}")
 
 
 
@@ -328,7 +331,7 @@ def handle_connection(key, mask):
         received = sock.recv(1024)
 
         if received:
-            print(f"Received: {data}")
+            #print(f"Received: {data}")
             data.incoming_buffer += received
 
             #If we don't know the incoming message length yet. We should try to read it
@@ -336,7 +339,7 @@ def handle_connection(key, mask):
                 #We can extract first 4 bytes as this is the message length prefix
                 data.messageLength = struct.unpack('!I', data.incoming_buffer[:4])[0] #
                 data.incoming_buffer = data.incoming_buffer[4:]
-                print(f"Expected Message Length {data.messageLength} bytes")
+                #print(f"Expected Message Length {data.messageLength} bytes")
 
             #If we do know the message length, we should process/clear incoming buffer once it has been fully received
             if data.messageLength is not None and len(data.incoming_buffer) >= data.messageLength:
@@ -355,7 +358,7 @@ def handle_connection(key, mask):
             # For demonstration, we immediately echo back the received data
             #data.outgoing_buffer += received  # Add it to outgoing buffer to echo it back
         else: #If 0 bytes received, client closed connection
-            print(f"Closing connection to {sock}")
+            #print(f"Closing connection to {sock}")
             sel.unregister(sock)
             sock.close()
             

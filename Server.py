@@ -13,7 +13,7 @@ sel = selectors.DefaultSelector()
 PRESET_DATA_CENTERS = [
     {"name": "DATA_CENTER_WEST", "host": "127.0.0.1", "port": 65432, "delay": .05},
     {"name": "DATA_CENTER_CENTRAL", "host": "127.0.0.1", "port": 65472, "delay": .05},
-    {"name": "DATA_CENTER_EAST", "host": "127.0.0.1", "port": 65502, "delay": 1},
+    {"name": "DATA_CENTER_EAST", "host": "127.0.0.1", "port": 65502, "delay": .05},
 ]
 
 
@@ -135,6 +135,7 @@ def commit_message(message):
     data[key] = {"value": value, "version": incoming_clock, "source": source}
 
     print_with_timestamp(f"Committed message: {message}")
+    print_with_timestamp(f"Updated data store: {data}")
     print_with_timestamp(f"Updated vector clock: {vectorClock}")
 
     global message_queue
@@ -220,13 +221,13 @@ def unpack_json_message(received_message):
     return json.loads(json_message)
 
 #With the decoded message and type passed in, this function should handle the Server's reaction to the message based on the type and content
-def handle_message_reaction(sock, data, message):
+def handle_message_reaction(sock, conn_data, message):
     """
     Function Needs To:
     1. Queue message in our server's local buffer.
     """
     #Need to get cid
-    cid = data.cid
+    cid = conn_data.cid
 
     message_type = message["type"]
     
@@ -234,13 +235,44 @@ def handle_message_reaction(sock, data, message):
     if message_type == "center_data_update":
         add_to_message_queue(message)
 
+    # For handling read requests from clients
+    elif message_type == "READ":
+        key = message["content"]
+        response = {"type": "READREPLY"}
+        if key in data:
+            response["content"] = data[key]
+        else:
+            response["content"] = f"Key '{key}' not found."
+        send_message_json(sock, response)
+        print_with_timestamp(f"Processed READ request for key '{key}'")
+
+    # For handling write requests from clients
+    elif message_type == "WRITE":
+        key = message["content"].get("key")
+        value = message["content"].get("value")
+        source = f"{name}_CLIENT"
+
+        # Update the vector clock and data store locally
+        data[key] = {
+            "value": value,
+            "version": dict(vectorClock),
+            "source": source
+        }
+
+        # Respond to the client
+        response = {"type": "WRITEREPLY", "content": f"Key '{key}' updated to '{value}'."}
+        send_message_json(sock, response)
+        print_with_timestamp(f"Processed WRITE request for key '{key}' with value '{value}'")
+
+        broadcast_write(key, value, randDelay=True)
 
     #else:
         #print(f"Unknown message Type received: {message_type}: {message_content} ", )
 ########################################################################################################################################
 # Data specific messaging code
+import random
 
-def broadcast_write(key, value):
+def broadcast_write(key, value, randDelay = True):
     print(f"Start Write: {key}, {value}")
     global name
     global vectorClock
@@ -258,6 +290,8 @@ def broadcast_write(key, value):
     #handle update message to a single center
     def send_update_to_center(data_center):
         try:
+            if randDelay:
+                time.sleep(random.uniform(0,1))
             time.sleep(data_center["delay"])  # Simulate network latency
             sock = open_server_connection(
                 server_name=data_center["name"],
@@ -295,12 +329,12 @@ def accept_incoming_connection(sock):
     connections += 1
     
     newCid = 'conn' + str(connections)
-    print(f"Accepted connection from {addr}, gave cid: {newCid}")
+    #print(f"Accepted connection from {addr}, gave cid: {newCid}")
 
 
 
     #Buffers will be registered to each socket for incoming and outgoing data to ensure no data is lost from incomplete sends and receives.
-    data = types.SimpleNamespace(
+    conn_data = types.SimpleNamespace(
             cid = newCid,
             broadcast = 0,
             incoming_buffer = b'',
@@ -310,7 +344,7 @@ def accept_incoming_connection(sock):
         )
     events = selectors.EVENT_READ | selectors.EVENT_WRITE
 
-    sel.register(conn, events, data = data)
+    sel.register(conn, events, data = conn_data)
 
 
 def handle_connection(key, mask):
@@ -322,7 +356,7 @@ def handle_connection(key, mask):
         received = sock.recv(1024)
 
         if received:
-            print(f"Received: {data}")
+            #print(f"Received: {data}")
             data.incoming_buffer += received
 
             #If we don't know the incoming message length yet. We should try to read it
@@ -337,7 +371,7 @@ def handle_connection(key, mask):
                 message = data.incoming_buffer[:data.messageLength]
 
                 message = unpack_json_message(message)
-                #print(message)
+                print(message)
                 
                 #Server's reaction to message
                 handle_message_reaction(sock, data, message)
@@ -349,7 +383,7 @@ def handle_connection(key, mask):
             # For demonstration, we immediately echo back the received data
             #data.outgoing_buffer += received  # Add it to outgoing buffer to echo it back
         else: #If 0 bytes received, client closed connection
-            print(f"Closing connection to {sock}")
+            #print(f"Closing connection to {sock}")
             sel.unregister(sock)
             sock.close()
             
@@ -366,7 +400,8 @@ def handle_connection(key, mask):
 #####################################################################################################################################
 # Testing
 broadcast_write("Alice", "I lost my ring!")
-broadcast_write("Alice", "I found it")
+broadcast_write("Alice2", "I found it")
+
 
 try:
     while True:
