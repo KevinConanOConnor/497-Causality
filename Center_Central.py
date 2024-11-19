@@ -55,7 +55,9 @@ def print_with_timestamp(message):
     Print a message with a timestamp.
     """
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print()
     print(f"[{timestamp}] {message}")
+    print()
 
 
 #############################################################################################################################################
@@ -132,8 +134,8 @@ def commit_message(message):
     # Update the data store
     data[key] = {"value": value, "version": incoming_clock, "source": source}
 
-    print(f"Committed message: {message}")
-    print(f"Updated vector clock: {vectorClock}")
+    print_with_timestamp(f"Committed message: {message}")
+    print_with_timestamp(f"Updated vector clock: {vectorClock}")
 
     global message_queue
     if message_queue:
@@ -149,13 +151,30 @@ def process_message_queue():
         # Get the message with the lowest vector clock sum (priority)
         clock_sum, message = heapq.heappop(message_queue)
 
-        # Check if the message before processing its results
-        if clock_sum <= clock_sum + 1:
-            commit_message(message)
+        incoming_clock = message["vector_clock"]
+        source = message["source"]
 
+        # Check if the message before processing its results
+        can_commit = True
+
+        for dc in vectorClock:
+            if dc == source:
+                # For the source, incoming_clock[dc] should be exactly one more
+                if incoming_clock.get(dc, 0) != vectorClock[dc] + 1:
+                    can_commit = False
+                    break
+            else:
+                # For other data centers, incoming_clock[dc] should be less than or equal
+                if incoming_clock.get(dc, 0) > vectorClock[dc]:
+                    can_commit = False
+                    break
+
+        if can_commit:
+            # Commit the message
+            commit_message(message)        # Commit the message and update the vector clock
         else:
             # If not ready, re-add the message to the buffer
-            print(f"Message not ready: {message}")
+            print_with_timestamp(f"Message not ready: {message}")
             heapq.heappush(message_queue, (clock_sum, message))
             # Exit loop as higher-priority messages depend on this one
 
@@ -169,7 +188,7 @@ def add_to_message_queue(message):
 
     # Push the message into the priority queue with the sum as the priority
     heapq.heappush(message_queue, (clock_sum, message))
-    print(f"Added message with vector clock sum {clock_sum} to input buffer: {message}")
+    print_with_timestamp(f"Added message with vector clock sum {clock_sum} to input buffer: {message}")
     process_message_queue()
 
 
@@ -318,7 +337,7 @@ def handle_connection(key, mask):
                 message = data.incoming_buffer[:data.messageLength]
 
                 message = unpack_json_message(message)
-                print(message)
+                #print(message)
                 
                 #Server's reaction to message
                 handle_message_reaction(sock, data, message)
