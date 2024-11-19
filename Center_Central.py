@@ -12,21 +12,21 @@ sel = selectors.DefaultSelector()
 
 PRESET_DATA_CENTERS = [
     {"name": "DATA_CENTER_WEST", "host": "127.0.0.1", "port": 65432, "delay": .05},
-    {"name": "DATA_CENTER_EAST", "host": "127.0.0.1", "port": 65472, "delay": .05},
-    {"name": "DATA_CENTER_NORTH", "host": "127.0.0.1", "port": 65502, "delay": .05},
+    #{"name": "DATA_CENTER_CENTRAL", "host": "127.0.0.1", "port": 65472, "delay": .05},
+    {"name": "DATA_CENTER_EAST", "host": "127.0.0.1", "port": 65502, "delay": .05},
 ]
 
 
-name = "DATA_CENTER_NORTH"
+name = "DATA_CENTER_CENTRAL"
 print(name)
 
 HOST = "127.0.0.1"  # Standard loopback interface address (localhost)
-PORT = 65502  # Port to listen on (non-privileged ports are > 1023)
+PORT = 65472  # Port to listen on (non-privileged ports are > 1023)
 
 vectorClock = {
     "DATA_CENTER_WEST": 0,
-    "DATA_CENTER_EAST": 0,
-    "DATA_CENTER_NORTH": 0, #-1 Until connection has actually opened
+    "DATA_CENTER_CENTRAL": 0,
+    "DATA_CENTER_EAST": 0, #-1 Until connection has actually opened
 }
 
 #Use Dictionaries to store messages
@@ -108,6 +108,7 @@ def open_server_connection(server_name, ip, port_number, timeout = 5):
 #####################################################################################################################################
 # MESSAGE QUEUEING AND PROCESSING CODE
 #####################################################################################################################################
+
 import heapq
 
 message_queue = []  # Priority queue for incoming messages
@@ -126,10 +127,10 @@ def commit_message(message):
 
     # Merge the incoming vector clock with the local one
     for dc in vectorClock:
-        vectorClock[dc] = max(vectorClock[dc], incoming_clock.get(dc, 0))
+        vectorClock[dc] = max(vectorClock[dc], incoming_clock.get(dc))
 
     # Update the data store
-    data[key] = {"value": value, "vector_clock": incoming_clock, "source": source}
+    data[key] = {"value": value, "version": incoming_clock, "source": source}
 
     print(f"Committed message: {message}")
     print(f"Updated vector clock: {vectorClock}")
@@ -164,11 +165,12 @@ def add_to_message_queue(message):
     Add a message to the input buffer based on the total sum of its vector clock.
     """
     # Calculate the priority as the sum of the vector clock values.
-    clock_sum = sum(message["vectorClock"].values())
+    clock_sum = sum(message["vector_clock"].values())
 
     # Push the message into the priority queue with the sum as the priority
     heapq.heappush(message_queue, (clock_sum, message))
     print(f"Added message with vector clock sum {clock_sum} to input buffer: {message}")
+    process_message_queue()
 
 
 ##############################################################################################################################################
@@ -208,15 +210,17 @@ def handle_message_reaction(sock, data, message):
     cid = data.cid
 
     message_type = message["type"]
+    
 
     if message_type == "center_data_update":
-        print(f"{message}")
+        add_to_message_queue(message)
 
 
     #else:
         #print(f"Unknown message Type received: {message_type}: {message_content} ", )
 ########################################################################################################################################
 # Data specific messaging code
+
 def broadcast_write(key, value):
     print(f"Start Write: {key}, {value}")
     global name
@@ -342,7 +346,6 @@ def handle_connection(key, mask):
 
 #####################################################################################################################################
 # Testing
-broadcast_write("Alan", "Lost")
 
 try:
     while True:
@@ -369,7 +372,6 @@ except KeyboardInterrupt:
     print("Caught keyboard interrupt, exiting")
 finally:
     sel.close()
-
 
 
 
