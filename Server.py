@@ -13,7 +13,7 @@ sel = selectors.DefaultSelector()
 PRESET_DATA_CENTERS = [
     {"name": "DATA_CENTER_WEST", "host": "127.0.0.1", "port": 65432, "delay": .05},
     {"name": "DATA_CENTER_CENTRAL", "host": "127.0.0.1", "port": 65472, "delay": .05},
-    {"name": "DATA_CENTER_EAST", "host": "127.0.0.1", "port": 65502, "delay": .05},
+    {"name": "DATA_CENTER_EAST", "host": "127.0.0.1", "port": 65502, "delay": 1},
 ]
 
 

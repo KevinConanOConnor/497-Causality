@@ -115,6 +115,10 @@ import heapq
 
 message_queue = []  # Priority queue for incoming messages
 
+def reaction(message):
+    if message["value"] == "I found it":
+        broadcast_write("Joe", "I'm glad!")
+
 def commit_message(message):
     """
     Commit a message to the data store and update the vector clock.
@@ -136,6 +140,8 @@ def commit_message(message):
 
     print_with_timestamp(f"Committed message: {message}")
     print_with_timestamp(f"Updated vector clock: {vectorClock}")
+
+    reaction(message)
 
     global message_queue
     if message_queue:
@@ -360,7 +366,7 @@ def handle_connection(key, mask):
         if not data.outgoing_buffer:
             if data.broadcast:
                 sel.unregister(sock)
-                sel.close()
+                sock.close()
 
 
 #####################################################################################################################################
