@@ -11,22 +11,22 @@ sel = selectors.DefaultSelector()
 
 
 PRESET_DATA_CENTERS = [
-    #{"name": "DATA_CENTER_WEST", "host": "127.0.0.1", "port": 65432, "delay": .05},
+    {"name": "DATA_CENTER_WEST", "host": "127.0.0.1", "port": 65432, "delay": .05},
     {"name": "DATA_CENTER_EAST", "host": "127.0.0.1", "port": 65472, "delay": .05},
     {"name": "DATA_CENTER_NORTH", "host": "127.0.0.1", "port": 65502, "delay": .05},
 ]
 
 
-name = "DATA_CENTER_WEST"
+name = "DATA_CENTER_NORTH"
 print(name)
 
 HOST = "127.0.0.1"  # Standard loopback interface address (localhost)
-PORT = 65432  # Port to listen on (non-privileged ports are > 1023)
+PORT = 65502  # Port to listen on (non-privileged ports are > 1023)
 
 vectorClock = {
     "DATA_CENTER_WEST": 0,
     "DATA_CENTER_EAST": 0,
-    "DATA_CENTER_NORTH": 0,
+    "DATA_CENTER_NORTH": 0, #-1 Until connection has actually opened
 }
 
 #Use Dictionaries to store messages
@@ -342,6 +342,7 @@ def handle_connection(key, mask):
 
 #####################################################################################################################################
 # Testing
+broadcast_write("Alan", "Lost")
 
 try:
     while True:
@@ -368,6 +369,7 @@ except KeyboardInterrupt:
     print("Caught keyboard interrupt, exiting")
 finally:
     sel.close()
+
 
 
 
